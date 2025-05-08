@@ -78,6 +78,16 @@ export default function SharePage() {
   const [feedbackDetailsForDisplay, setFeedbackDetailsForDisplay] = useState<{ friendAnswer: string, creatorAnswer: string, isCorrect: boolean } | null>(null);
 
   useEffect(() => {
+    if (view === 'score' && quizDataForFriend) {
+      setShowConfetti(true);
+      // Das Konfetti stoppt von selbst, da recycle={false} wahrscheinlich in der Komponente gesetzt ist.
+      // Falls es explizit nach einer Zeit ausgeblendet werden soll:
+      // const timer = setTimeout(() => setShowConfetti(false), 10000); // z.B. nach 10 Sekunden
+      // return () => clearTimeout(timer);
+    }
+  }, [view, quizDataForFriend, setShowConfetti]);
+
+  useEffect(() => {
     if (typeof window !== 'undefined') {
       const localCreatorName = localStorage.getItem('creatorName') ?? undefined; 
       const isCreator = isCreatorLocalStorage(slug, localCreatorName);
@@ -529,10 +539,72 @@ export default function SharePage() {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] text-center p-4">
-        <Loader2 className="h-16 w-16 animate-spin text-primary mb-6" />
-        <h2 className="text-2xl font-semibold text-muted-foreground">Quiz wird geladen...</h2>
-        <p className="text-md mt-2">Wenn dies zu lange dauert, ist der Link möglicherweise ungültig oder es liegt ein Netzwerkproblem vor.</p>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-background to-muted/30 py-8 px-4 flex flex-col items-center">
+      {showConfetti && (
+        <Confetti
+          width={typeof window !== 'undefined' ? window.innerWidth : 0}
+          height={typeof window !== 'undefined' ? window.innerHeight : 0}
+          recycle={false}
+          numberOfPieces={400} // Increased for more celebration!
+          gravity={0.15} // Adjusted for a slightly floatier effect
+          initialVelocityX={{ min: -10, max: 10}}
+          initialVelocityY={{ min: -15, max: 5}}
+          className="!fixed !z-[9999]"
+        />
+      )}
+
+      {isCurrentUserCreator && creatorLocalStorageQuizData && (
+        <div className="flex justify-center items-start py-10 sm:py-16">
+          <Card className="w-full max-w-xl shadow-xl border-2 border-primary/30">
+            <CardHeader className="text-center pt-8">
+              <Award className="mx-auto h-16 w-16 text-primary mb-3" />
+              <CardTitle className="text-3xl sm:text-4xl font-bold">Dein Quiz ist Live!</CardTitle>
+              <CardDescription className="text-md sm:text-lg pt-2 text-muted-foreground">
+                Teile diesen Link mit deinen Freunden und finde heraus, wer <span className="font-semibold text-foreground">{creatorLocalStorageQuizData.creatorName}</span> am besten kennt.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6 px-6 sm:px-8">
+              <div className="space-y-2">
+                <Label htmlFor="share-link" className="text-lg font-medium">Dein einzigartiger Quiz-Link:</Label>
+                <div className="flex items-center space-x-2">
+                  <Input id="share-link" type="text" value={shareUrlWithData} readOnly className="h-12 text-base bg-muted/50 flex-grow" aria-label="Teilbarer Quiz-Link" />
+                  <Button variant="outline" size="lg" onClick={copyToClipboard} aria-label="Link kopieren" className="h-12">
+                    {copied ? <Check className="h-5 w-5 text-green-500" /> : <Copy className="h-5 w-5" />}
+                    <span className="ml-2">{copied ? 'Kopiert!' : 'Kopieren'}</span>
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-3 pt-2">
+                  <p className="text-center text-md font-medium text-muted-foreground">Oder direkt teilen über:</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <Button variant="outline" size="lg" className="h-12 border-green-500 text-green-600 hover:bg-green-500/10" onClick={() => handleShareIntent('whatsapp')}>
+                      <MessageSquareText className="mr-2 h-5 w-5" /> WhatsApp
+                  </Button>
+                  <Button variant="outline" size="lg" className="h-12 border-blue-600 text-blue-700 hover:bg-blue-600/10" onClick={() => handleShareIntent('messenger')}>
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" className="mr-2 h-5 w-5" viewBox="0 0 16 16" aria-hidden="true">
+                          <path d="M0 7.75C0 3.473 3.473 0 7.75 0S15.5 3.473 15.5 7.75c0 4.002-3.005 7.293-6.902 7.672L6.08 16.353V13.57a.5.5 0 0 0-.325-.466C2.436 12.64 0 10.395 0 7.75zm2.37.045a.5.5 0 0 1 .5-.5h10.26a.5.5 0 0 1 .5.5v.01a.5.5 0 0 1-.5.5H2.87a.5.5 0 0 1-.5-.5v-.01zm2.083 2.063a.5.5 0 0 1 .5-.5h6.104a.5.5 0 0 1 .5.5v.01a.5.5 0 0 1-.5.5H4.953a.5.5 0 0 1-.5-.5v-.01zM4.453 3.62a.5.5 0 0 1 .5-.5H11.05a.5.5 0 0 1 .5.5v.01a.5.5 0 0 1-.5.5H4.953a.5.5 0 0 1-.5-.5v-.01z"/>
+                      </svg>
+                      Messenger
+                  </Button>
+                  <Button variant="outline" size="lg" className="h-12 border-gray-500 text-gray-600 hover:bg-gray-500/10" onClick={() => handleShareIntent('email')}>
+                      <Mail className="mr-2 h-5 w-5" /> E-Mail
+                  </Button>
+                  </div>
+              </div>
+            </CardContent>
+            <CardFooter className="flex flex-col sm:flex-row justify-between items-center gap-4 px-6 sm:px-8 pb-8 pt-4">
+              <Button onClick={() => router.push(`/results/${slug}`)} variant="secondary" size="lg" className="w-full sm:w-auto text-lg py-3 h-auto">
+                <BarChartBig className="mr-2 h-5 w-5" /> Ergebnisse ansehen
+              </Button>
+              <Link href="/" className="w-full sm:w-auto">
+                <Button variant="ghost" size="lg" className="w-full text-lg py-3 h-auto text-primary hover:text-primary/80">
+                  Neues Quiz erstellen
+                </Button>
+              </Link>
+            </CardFooter>
+          </Card>
+        </div>
+      )}
+    </div>
   );
 }
