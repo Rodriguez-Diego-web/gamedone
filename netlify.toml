@@ -2,7 +2,6 @@
   command = "npm run build"
   publish = ".next"
 
-[plugins]
-  # Installs the Next.js Runtime on Netlify
-  [[plugins]]
-    package = "@netlify/plugin-nextjs"
+# Installs the Next.js Runtime on Netlify
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
