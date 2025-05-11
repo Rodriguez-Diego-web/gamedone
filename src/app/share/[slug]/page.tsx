@@ -642,28 +642,6 @@ export default function SharePage() {
                     <p>Antwortoptionen konnten nicht geladen werden oder sind für diese Frage nicht verfügbar.</p>
                   </div>
                 )}
-
-                {feedbackDetailsForDisplay && (
-                  <Card className="mt-6 bg-muted/50 p-4 space-y-3">
-                    <CardTitle className="text-lg">Feedback</CardTitle>
-                    <div>
-                      <p className="text-sm font-medium">Deine Auswahl:</p>
-                      <p className="text-base font-semibold">{feedbackDetailsForDisplay.friendAnswer}</p>
-                    </div>
-                    {!feedbackDetailsForDisplay.isCorrect && (
-                      <div>
-                        <p className="text-sm font-medium">Korrekte Antwort vom Ersteller:</p>
-                        <p className="text-base font-semibold text-blue-600">{feedbackDetailsForDisplay.creatorAnswer}</p>
-                      </div>
-                    )}
-                    <div className="flex items-center">
-                      {feedbackDetailsForDisplay.isCorrect ? <ThumbsUp className="h-5 w-5 text-green-600 mr-2" /> : <ThumbsDown className="h-5 w-5 text-red-600 mr-2" />}
-                      <p className={`text-base font-semibold ${feedbackDetailsForDisplay.isCorrect ? 'text-green-600' : 'text-red-600'}`}>
-                        {feedbackDetailsForDisplay.isCorrect ? "Richtig!" : "Leider nicht ganz..."}
-                      </p>
-                    </div>
-                  </Card>
-                )}
               </CardContent>
               <CardFooter className="flex flex-col sm:flex-row justify-center items-center pt-6">
                 <Button 

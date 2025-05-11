@@ -12,9 +12,13 @@ export default {
   	extend: {
       fontFamily: {
         sans: [`var(--font-geist-sans)`, ...fontFamily.sans],
-        // mono: [`var(--font-geist-mono)`, ...fontFamily.mono], // Removed as GeistMono is not used
       },
   		colors: {
+        // Define HSL values for CSS variables here for clarity, actual definition in globals.css / style tag
+        // --brand-pink-h: 330; --brand-pink-s: 82%; --brand-pink-l: 60%; (ca. #EC4899)
+        // --brand-cyan-h: 190; --brand-cyan-s: 80%; --brand-cyan-l: 53%; (ca. #22D3EE)
+        'brand-pink': 'hsl(var(--brand-pink-h) var(--brand-pink-s) var(--brand-pink-l))',
+        'brand-cyan': 'hsl(var(--brand-cyan-h) var(--brand-cyan-s) var(--brand-cyan-l))',
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
   			card: {
@@ -26,7 +30,7 @@ export default {
   				foreground: 'hsl(var(--popover-foreground))'
   			},
   			primary: {
-  				DEFAULT: 'hsl(var(--primary))',
+  				DEFAULT: 'hsl(var(--brand-pink-h) var(--brand-pink-s) var(--brand-pink-l))',
   				foreground: 'hsl(var(--primary-foreground))'
   			},
   			secondary: {
