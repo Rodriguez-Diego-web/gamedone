@@ -98,13 +98,14 @@ export default function QuestionDisplay({
             onChange={handleInputChange}
             placeholder={question.answerPlaceholder || 'Gib hier deine Antwort ein...'}
             className={cn(
-              "text-lg h-14 px-4 py-3 shadow-inner", // Increased size & padding
+              "text-lg h-14 px-4 py-3 shadow-inner", 
               isFeedbackModeForFriend && feedbackDetails?.isCorrect && "border-green-500 ring-2 ring-green-500 focus-visible:ring-green-500 bg-green-500/10 text-green-700 placeholder:text-green-700/70 font-medium",
               isFeedbackModeForFriend && feedbackDetails && !feedbackDetails.isCorrect && "border-destructive ring-2 ring-destructive focus-visible:ring-destructive bg-destructive/10 text-destructive placeholder:text-destructive/70 font-medium"
             )}
             aria-label="Antworteingabe"
             disabled={isFeedbackModeForFriend}
             aria-invalid={isFeedbackModeForFriend && feedbackDetails && !feedbackDetails.isCorrect}
+            style={{ fontSize: '16px' }} // Explicitly set font size for iOS zoom prevention
           />
         )}
         {isFeedbackModeForFriend && feedbackDetails?.isCorrect && (
