@@ -5,6 +5,8 @@ import { Sparkles, Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
 import MobileMenu from '@/components/MobileMenu'; 
+import Image from 'next/image'; 
+import DudesPerfectLogo from '../../app/logo.png'; 
 
 export default function Header() {
   const [isMounted, setIsMounted] = useState(false);
@@ -28,10 +30,13 @@ export default function Header() {
     <header className="py-4 px-4 sm:px-6 lg:px-8 border-b sticky top-0 bg-background/95 backdrop-blur z-50">
       <div className="container mx-auto flex items-center justify-between">
         <Link href="/" className="flex items-center space-x-2 group">
-          <Sparkles className="h-7 w-7 text-primary group-hover:animate-pulse" />
-          <span className="text-2xl font-bold tracking-tight text-foreground group-hover:text-primary transition-colors">
-            Dudes Perfect
-          </span>
+          <Image 
+            src={DudesPerfectLogo} 
+            alt="Dudes Perfect Logo" 
+            width={70} 
+            height={20} 
+            priority 
+          />
         </Link>
 
         <nav className="hidden md:flex items-center space-x-4">

@@ -6,8 +6,14 @@ import { Toaster } from '@/components/ui/toaster';
 import Footer from '@/components/Footer';
 
 export const metadata: Metadata = {
-  title: 'Friendship Finder',
+  title: 'Dudes Perfect',
   description: 'Create and share quizzes to find out how well your friends know you!',
+  viewport: {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

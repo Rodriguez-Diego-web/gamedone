@@ -20,6 +20,7 @@ interface QuestionDisplayProps {
   feedbackDetails?: { friendAnswer: string, creatorAnswer: string, isCorrect: boolean } | null;
   currentInputValue: string; 
   onCurrentInputValueChange: (value: string) => void;
+  isMcqMode?: boolean;
 }
 
 export default function QuestionDisplay({
@@ -33,6 +34,7 @@ export default function QuestionDisplay({
   feedbackDetails = null, 
   currentInputValue,
   onCurrentInputValueChange,
+  isMcqMode = false,
 }: QuestionDisplayProps) {
   const { toast } = useToast();
   
@@ -89,20 +91,22 @@ export default function QuestionDisplay({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 pt-2 pb-5">
-        <Input
-          type="text"
-          value={displayValue}
-          onChange={handleInputChange}
-          placeholder={question.answerPlaceholder || 'Gib hier deine Antwort ein...'}
-          className={cn(
-            "text-lg h-14 px-4 py-3 shadow-inner", // Increased size & padding
-            isFeedbackModeForFriend && feedbackDetails?.isCorrect && "border-green-500 ring-2 ring-green-500 focus-visible:ring-green-500 bg-green-500/10 text-green-700 placeholder:text-green-700/70 font-medium",
-            isFeedbackModeForFriend && feedbackDetails && !feedbackDetails.isCorrect && "border-destructive ring-2 ring-destructive focus-visible:ring-destructive bg-destructive/10 text-destructive placeholder:text-destructive/70 font-medium"
-          )}
-          aria-label="Antworteingabe"
-          disabled={isFeedbackModeForFriend}
-          aria-invalid={isFeedbackModeForFriend && feedbackDetails && !feedbackDetails.isCorrect}
-        />
+        {!isMcqMode && (
+          <Input
+            type="text"
+            value={displayValue}
+            onChange={handleInputChange}
+            placeholder={question.answerPlaceholder || 'Gib hier deine Antwort ein...'}
+            className={cn(
+              "text-lg h-14 px-4 py-3 shadow-inner", // Increased size & padding
+              isFeedbackModeForFriend && feedbackDetails?.isCorrect && "border-green-500 ring-2 ring-green-500 focus-visible:ring-green-500 bg-green-500/10 text-green-700 placeholder:text-green-700/70 font-medium",
+              isFeedbackModeForFriend && feedbackDetails && !feedbackDetails.isCorrect && "border-destructive ring-2 ring-destructive focus-visible:ring-destructive bg-destructive/10 text-destructive placeholder:text-destructive/70 font-medium"
+            )}
+            aria-label="Antworteingabe"
+            disabled={isFeedbackModeForFriend}
+            aria-invalid={isFeedbackModeForFriend && feedbackDetails && !feedbackDetails.isCorrect}
+          />
+        )}
         {isFeedbackModeForFriend && feedbackDetails?.isCorrect && (
             <p className="text-md text-center font-semibold text-green-600 flex items-center justify-center">
                 <CheckCircle className="h-5 w-5 mr-2"/> Richtig! Genau das hat {creatorName} gesagt.
@@ -114,34 +118,36 @@ export default function QuestionDisplay({
           </p>
         )}
       </CardContent>
-      <CardFooter className="flex flex-col sm:flex-row justify-center sm:justify-end space-y-3 sm:space-y-0 sm:space-x-4 pt-0 pb-6 px-6">
-        <Button 
-          variant="outline" 
-          onClick={onSkipQuestion} 
-          size="lg" 
-          className="w-full sm:w-auto text-md py-3"
-          disabled={isFeedbackModeForFriend || (!isCreatorMode && isFriendMode && feedbackDetails !== null)} 
-        >
-          <SkipForward className="mr-2 h-5 w-5" />
-          {isCreatorMode ? 'Frage überspringen' : (feedbackDetails ? 'Weiter' : 'Überspringen')}
-        </Button>
-        <Button 
-          onClick={handleSubmitClick} 
-          size="lg" 
-          className="w-full sm:w-auto text-md py-3"
-          disabled={!isCreatorMode && isFriendMode && feedbackDetails !== null && !feedbackDetails.isCorrect && currentInputValue !== feedbackDetails.creatorAnswer && currentInputValue !== feedbackDetails.friendAnswer} // Disable submit if friend is in feedback for wrong answer and hasn't changed to proceed
-        >
-          {isFeedbackModeForFriend ? (
-            <>
-              Nächste Frage <ArrowRight className="ml-2 h-5 w-5" />
-            </>
-          ) : (
-            <>
-              Antwort abschicken <Send className="ml-2 h-5 w-5" />
-            </>
-          )}
-        </Button>
-      </CardFooter>
+      {!isMcqMode && (
+        <CardFooter className="flex flex-col sm:flex-row justify-center sm:justify-end space-y-3 sm:space-y-0 sm:space-x-4 pt-0 pb-6 px-6">
+          <Button 
+            variant="outline" 
+            onClick={onSkipQuestion} 
+            size="lg" 
+            className="w-full sm:w-auto text-md py-3"
+            disabled={isFeedbackModeForFriend || (!isCreatorMode && isFriendMode && feedbackDetails !== null)} 
+          >
+            <SkipForward className="mr-2 h-5 w-5" />
+            {isCreatorMode ? 'Frage überspringen' : (feedbackDetails ? 'Weiter' : 'Überspringen')}
+          </Button>
+          <Button 
+            onClick={handleSubmitClick} 
+            size="lg" 
+            className="w-full sm:w-auto text-md py-3"
+            disabled={!isCreatorMode && isFriendMode && feedbackDetails !== null && !feedbackDetails.isCorrect && currentInputValue !== feedbackDetails.creatorAnswer && currentInputValue !== feedbackDetails.friendAnswer} // Disable submit if friend is in feedback for wrong answer and hasn't changed to proceed
+          >
+            {isFeedbackModeForFriend ? (
+              <>
+                Nächste Frage <ArrowRight className="ml-2 h-5 w-5" />
+              </>
+            ) : (
+              <>
+                Antwort abschicken <Send className="ml-2 h-5 w-5" />
+              </>
+            )}
+          </Button>
+        </CardFooter>
+      )}
     </Card>
   );
 }

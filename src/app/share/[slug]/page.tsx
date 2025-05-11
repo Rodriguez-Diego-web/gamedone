@@ -16,6 +16,7 @@ import Confetti from 'react-confetti';
 import Link from 'next/link';
 import { firestore } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { normalizeAnswer, calculateLevenshteinDistance } from '@/lib/string-utils';
 
 const isCreatorLocalStorage = (slug: string, currentCreatorName: string | undefined): boolean => {
   if (typeof window === 'undefined' || !currentCreatorName) return false;
@@ -77,6 +78,19 @@ export default function SharePage() {
   const [currentFriendInputValue, setCurrentFriendInputValue] = useState('');
   const [feedbackDetailsForDisplay, setFeedbackDetailsForDisplay] = useState<{ friendAnswer: string, creatorAnswer: string, isCorrect: boolean } | null>(null);
 
+  const [mcqOptions, setMcqOptions] = useState<string[]>([]);
+  const [isLoadingOptions, setIsLoadingOptions] = useState(false);
+  const [selectedMcqAnswer, setSelectedMcqAnswer] = useState<string | null>(null);
+
+  console.log(
+    '[SharePage Render Cycle] View:', view,
+    '| isLoading:', isLoading,
+    '| isLoadingOptions:', isLoadingOptions,
+    '| mcqOptions.length:', mcqOptions.length,
+    '| QData loaded:', !!quizDataForFriend,
+    '| Current QIndex:', currentQuestionIndex
+  );
+
   useEffect(() => {
     if (view === 'score' && quizDataForFriend) {
       setShowConfetti(true);
@@ -109,7 +123,13 @@ export default function SharePage() {
               cn: parsedQuizData.creatorName,
               qa: parsedQuizData.creatorAnswers.map(ans => ({ qid: ans.questionId, a: ans.answer })),
             };
-            const encodedData = btoa(JSON.stringify(dataToEncode));
+            const jsonString = JSON.stringify(dataToEncode);
+            const uint8Array = new TextEncoder().encode(jsonString);
+            let binaryString = '';
+            for (let i = 0; i < uint8Array.length; i++) {
+                binaryString += String.fromCharCode(uint8Array[i]);
+            }
+            const encodedData = btoa(binaryString);
             const baseUrl = `${window.location.origin}/share/${slug}`; 
             const fullShareUrl = `${baseUrl}?data=${encodeURIComponent(encodedData)}`;
             setShareUrlWithData(fullShareUrl);
@@ -125,12 +145,14 @@ export default function SharePage() {
         }
         setIsLoading(false);
       } else if (quizDataFromUrl) {
-        console.log('[Freundansicht] Vollständiger URL:', window.location.href);
-        console.log('[Freundansicht] Extrahiertes quizDataFromUrl:', quizDataFromUrl);
         try {
-          const decodedDataString = atob(decodeURIComponent(quizDataFromUrl));
+          const base64DecodedBinaryString = atob(decodeURIComponent(quizDataFromUrl));
+          const uint8Array = new Uint8Array(base64DecodedBinaryString.length);
+          for (let i = 0; i < base64DecodedBinaryString.length; i++) {
+            uint8Array[i] = base64DecodedBinaryString.charCodeAt(i);
+          }
+          const decodedDataString = new TextDecoder().decode(uint8Array);
           const decodedQuizData: EncodedQuizData = JSON.parse(decodedDataString);
-          
           if (!decodedQuizData.cn || !decodedQuizData.qa) {
             throw new Error("Decoded quiz data is missing essential fields.");
           }
@@ -161,6 +183,63 @@ export default function SharePage() {
       }
     }
   }, [slug, router, toast, searchParams]);
+
+  useEffect(() => {
+    if (view === 'answering' && quizDataForFriend && quizDataForFriend.questionsUsed[currentQuestionIndex]) {
+      console.log('[MCQ useEffect] Triggered. View:', view, 'CurrentQIndex:', currentQuestionIndex);
+      const fetchOptions = async () => {
+        console.log('[fetchOptions] Starting to fetch options.');
+        setIsLoadingOptions(true);
+        setMcqOptions([]); 
+        setCurrentFriendInputValue('');
+
+        const currentQ = quizDataForFriend.questionsUsed[currentQuestionIndex];
+        const creatorNameStr = quizDataForFriend.creatorName || "Der Ersteller";
+        
+        let questionTextForApi: string;
+        if (typeof currentQ.text === 'function') {
+          questionTextForApi = currentQ.text(creatorNameStr); 
+        } else {
+          questionTextForApi = currentQ.text as string; 
+        }
+
+        let correctAnswer = quizDataForFriend.creatorAnswers[currentQuestionIndex]?.answer || '';
+        if (correctAnswer.includes('||')) {
+          correctAnswer = correctAnswer.split('||')[0].trim();
+        }
+
+        console.log('[fetchOptions] About to call API. Question:', questionTextForApi, 'CorrectAnswer:', correctAnswer);
+        try {
+          const response = await fetch('/api/generate-options', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ question: questionTextForApi, correctAnswer }),
+          });
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({})); 
+            throw new Error(`API error: ${response.status} ${response.statusText}. ${errorData.error || ''}`);
+          }
+          const data = await response.json();
+          if (data.options && Array.isArray(data.options)) {
+            setMcqOptions(data.options);
+            console.log('[fetchOptions] Successfully fetched and set options:', data.options);
+          } else {
+            throw new Error('No valid options array returned from API');
+          }
+        } catch (error: any) {
+          console.error('[fetchOptions] Error fetching options:', error);
+          const fallbackOpts = [correctAnswer, "Konnte Optionen nicht laden A", "Konnte Optionen nicht laden B", "Konnte Optionen nicht laden C"].filter(Boolean);
+          setMcqOptions(fallbackOpts);
+          console.log('[fetchOptions] Fallback options set:', fallbackOpts);
+          toast({ title: 'Fehler beim Laden der Antwortoptionen', description: error.message || 'Bitte versuche es später erneut.', variant: 'destructive' });
+        } finally {
+          console.log('[fetchOptions] Setting isLoadingOptions to false.');
+          setIsLoadingOptions(false);
+        }
+      };
+      fetchOptions();
+    }
+  }, [view, currentQuestionIndex, quizDataForFriend, friendName, toast]);
 
   const copyToClipboard = () => {
     console.log('[Kopieraktion] Versuch, URL zu kopieren:', shareUrlWithData); 
@@ -196,13 +275,58 @@ export default function SharePage() {
     }
   }, [view, slug]);
 
+  const isAnswerSimilar = (friendAnswerRaw: string, creatorAnswersRaw: string): { similar: boolean; matchedCreatorAnswer: string } => {
+    const normalizedFriendAnswer = normalizeAnswer(friendAnswerRaw);
+    const creatorPossibleAnswers = creatorAnswersRaw.split('||').map(ans => ans.trim()).filter(ans => ans.length > 0);
+
+    if (creatorPossibleAnswers.length === 0) {
+        // Edge case: creator provided empty or only '||' answers.
+        // Consider it a match if the friend also provided an empty normalized answer.
+        const isFriendAnsEmpty = normalizedFriendAnswer === '';
+        return { similar: isFriendAnsEmpty, matchedCreatorAnswer: creatorAnswersRaw }; 
+    }
+
+    for (const singleCreatorAnswer of creatorPossibleAnswers) {
+      const normalizedCreatorAnswer = normalizeAnswer(singleCreatorAnswer);
+  
+      if (normalizedFriendAnswer === normalizedCreatorAnswer) {
+        return { similar: true, matchedCreatorAnswer: singleCreatorAnswer }; // Exact match after normalization
+      }
+  
+      const distance = calculateLevenshteinDistance(normalizedFriendAnswer, normalizedCreatorAnswer);
+      const maxLength = Math.max(normalizedFriendAnswer.length, normalizedCreatorAnswer.length);
+      let threshold = 0;
+  
+      if (maxLength === 0) { // Handles case where both normalized strings are empty
+        return { similar: true, matchedCreatorAnswer: singleCreatorAnswer };
+      } else if (maxLength <= 3) {
+        threshold = 0;
+      } else if (maxLength <= 6) { // 4-6 characters
+        threshold = 1;
+      } else if (maxLength <= 10) { // 7-10 characters
+        threshold = 2;
+      } else { // >10 characters
+        threshold = 3;
+      }
+      
+      if (distance <= threshold) {
+        return { similar: true, matchedCreatorAnswer: singleCreatorAnswer };
+      }
+    }
+    // If no match found, return false. For feedback, show the *first* creator answer option.
+    return { similar: false, matchedCreatorAnswer: creatorPossibleAnswers[0] || creatorAnswersRaw };
+  };
+
   const calculateAndFinalizeScore = async (currentAnswers: SubmittedAnswer[]) => {
     if (!quizDataForFriend) return;
     let score = 0;
     currentAnswers.forEach(friendAns => {
-      const creatorAns = quizDataForFriend.creatorAnswers.find(ca => ca.questionId === friendAns.questionId);
-      if (creatorAns && !friendAns.answer.startsWith('__SKIPPED_') && friendAns.answer.trim().toLowerCase() === creatorAns.answer.trim().toLowerCase()) {
-        score++;
+      const creatorAnsObj = quizDataForFriend.creatorAnswers.find(ca => ca.questionId === friendAns.questionId);
+      if (creatorAnsObj && !friendAns.answer.startsWith('__SKIPPED_')) {
+        const similarityResult = isAnswerSimilar(friendAns.answer, creatorAnsObj.answer);
+        if (similarityResult.similar) {
+          score++;
+        }
       }
     });
     setFriendScore(score);
@@ -281,15 +405,17 @@ export default function SharePage() {
         return;
       }
 
-      const creatorCorrectAnswer = creatorAnsObj.answer;
-      const isCorrect = submittedAnswerValue.trim().toLowerCase() === creatorCorrectAnswer.trim().toLowerCase();
+      const creatorAnswerOptions = creatorAnsObj.answer;
+      const similarityResult = isAnswerSimilar(submittedAnswerValue, creatorAnswerOptions);
+      const isCorrect = similarityResult.similar;
+      const displayCreatorAnswer = similarityResult.matchedCreatorAnswer; // Use the matched or first answer for display
       
       const newAnswerRecord: SubmittedAnswer = { questionId: currentQ.id, answer: submittedAnswerValue.trim() };
       setFriendAnswers(prev => [...prev, newAnswerRecord]);
       
       setFeedbackDetailsForDisplay({ 
         friendAnswer: submittedAnswerValue.trim(), 
-        creatorAnswer: creatorCorrectAnswer, 
+        creatorAnswer: displayCreatorAnswer, // Show the matched/first creator answer
         isCorrect 
       });
     }
@@ -335,6 +461,10 @@ export default function SharePage() {
     }
     window.open(url, '_blank', 'noopener,noreferrer');
 };
+
+  const handleMcqAnswerSelection = (option: string) => {
+    setSelectedMcqAnswer(option);
+  };
 
   if (isLoading || isCurrentUserCreator === null) {
     return (
@@ -444,13 +574,22 @@ export default function SharePage() {
     }
 
     if (view === 'answering') {
+      if (!quizDataForFriend || !quizDataForFriend.questionsUsed[currentQuestionIndex]) {
+        return (
+          <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            <p className="mt-4 text-lg text-muted-foreground">Quiz-Daten werden geladen...</p>
+          </div>
+        );
+      }
+
       const questionsProcessedCount = feedbackDetailsForDisplay ? currentQuestionIndex + 1 : currentQuestionIndex;
       const progressPercentage = quizDataForFriend.questionsUsed.length > 0 
         ? (questionsProcessedCount / quizDataForFriend.questionsUsed.length) * 100 
         : 0;
       
       return (
-        <div className="flex flex-col items-center space-y-8 py-8">
+        <div className="flex flex-col items-center space-y-8 py-8 w-full px-4"> 
            <div className="w-full max-w-2xl space-y-3">
             <p className="text-center text-lg font-medium text-primary">
               Du machst gerade {quizDataForFriend.creatorName}s Quiz, {friendName}!
@@ -460,22 +599,91 @@ export default function SharePage() {
               Frage {Math.min(currentQuestionIndex + 1, quizDataForFriend.questionsUsed.length)} von {quizDataForFriend.questionsUsed.length}
             </p>
           </div>
+
           {quizDataForFriend.questionsUsed.length > 0 && currentQuestionIndex < quizDataForFriend.questionsUsed.length ? (
-            <QuestionDisplay
-              question={quizDataForFriend.questionsUsed[currentQuestionIndex]}
-              onSubmitOrNext={handleSubmitAnswerOrProceed}
-              onSkipQuestion={handleSkipQuestion}
-              questionNumber={currentQuestionIndex + 1}
-              totalQuestions={quizDataForFriend.questionsUsed.length}
-              creatorName={quizDataForFriend.creatorName}
-              feedbackDetails={feedbackDetailsForDisplay}
-              currentInputValue={currentFriendInputValue}
-              onCurrentInputValueChange={setCurrentFriendInputValue}
-            />
+            <Card className="w-full max-w-2xl mt-4"> 
+              <CardHeader>
+                <CardTitle>Frage {currentQuestionIndex + 1}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <QuestionDisplay
+                  question={quizDataForFriend.questionsUsed[currentQuestionIndex]}
+                  creatorName={quizDataForFriend.creatorName || "Der Ersteller"}
+                  questionNumber={currentQuestionIndex + 1}
+                  totalQuestions={quizDataForFriend.questionsUsed.length}
+                  onSubmitOrNext={handleSubmitAnswerOrProceed}
+                  onSkipQuestion={() => { console.log('Skip in MCQ mode - not implemented'); }}
+                  currentInputValue={currentFriendInputValue}
+                  onCurrentInputValueChange={setCurrentFriendInputValue}
+                  feedbackDetails={feedbackDetailsForDisplay}
+                  isMcqMode={true}
+                />
+                {isLoadingOptions ? (
+                  <div className="flex flex-col items-center justify-center py-8 space-y-2">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    <p className="text-muted-foreground">Lade Antwortoptionen...</p>
+                  </div>
+                ) : mcqOptions.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+                    {mcqOptions.map((option, index) => (
+                      <Button
+                        key={index}
+                        variant={selectedMcqAnswer === option ? "default" : "outline"}
+                        onClick={() => handleMcqAnswerSelection(option)}
+                        className="text-sm sm:text-base p-4 sm:p-5 h-auto whitespace-normal break-words justify-start text-left leading-tight focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        disabled={feedbackDetailsForDisplay !== null} // Disable after an answer has been submitted and feedback is shown
+                      >
+                        {option}
+                      </Button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center text-muted-foreground mt-4 p-4 border border-dashed rounded-md">
+                    <p>Antwortoptionen konnten nicht geladen werden oder sind für diese Frage nicht verfügbar.</p>
+                  </div>
+                )}
+
+                {feedbackDetailsForDisplay && (
+                  <Card className="mt-6 bg-muted/50 p-4 space-y-3">
+                    <CardTitle className="text-lg">Feedback</CardTitle>
+                    <div>
+                      <p className="text-sm font-medium">Deine Auswahl:</p>
+                      <p className="text-base font-semibold">{feedbackDetailsForDisplay.friendAnswer}</p>
+                    </div>
+                    {!feedbackDetailsForDisplay.isCorrect && (
+                      <div>
+                        <p className="text-sm font-medium">Korrekte Antwort vom Ersteller:</p>
+                        <p className="text-base font-semibold text-blue-600">{feedbackDetailsForDisplay.creatorAnswer}</p>
+                      </div>
+                    )}
+                    <div className="flex items-center">
+                      {feedbackDetailsForDisplay.isCorrect ? <ThumbsUp className="h-5 w-5 text-green-600 mr-2" /> : <ThumbsDown className="h-5 w-5 text-red-600 mr-2" />}
+                      <p className={`text-base font-semibold ${feedbackDetailsForDisplay.isCorrect ? 'text-green-600' : 'text-red-600'}`}>
+                        {feedbackDetailsForDisplay.isCorrect ? "Richtig!" : "Leider nicht ganz..."}
+                      </p>
+                    </div>
+                  </Card>
+                )}
+              </CardContent>
+              <CardFooter className="flex flex-col sm:flex-row justify-center items-center pt-6">
+                <Button 
+                  onClick={() => handleSubmitAnswerOrProceed(selectedMcqAnswer || undefined)} 
+                  disabled={
+                    feedbackDetailsForDisplay === null && !selectedMcqAnswer // Disable only if in answering mode and no MCQ answer is selected
+                  }
+                  size="lg"
+                  className="w-full sm:w-auto min-w-[180px]"
+                >
+                  {feedbackDetailsForDisplay 
+                    ? (currentQuestionIndex < quizDataForFriend.questionsUsed.length - 1 ? 'Nächste Frage' : 'Ergebnis anzeigen') 
+                    : 'Antworten'}
+                </Button>
+              </CardFooter>
+            </Card>
           ) : (
             <div className="flex flex-col items-center justify-center min-h-[calc(100vh-400px)]">
-              <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-              <p className="text-lg text-muted-foreground">Bereite alles vor...</p>
+              <Loader2 className="h-12 w-12 animate-spin text-primary" />
+              <p className="text-lg text-muted-foreground">Bereite Frage vor...</p>
             </div>
           )}
         </div>
@@ -521,7 +729,7 @@ export default function SharePage() {
                   </p>
                   <p className="text-md sm:text-lg text-muted-foreground px-4">{scoreMessage}</p>
               </CardContent>
-              <CardFooter className="flex flex-col space-y-4 px-8 pb-8">
+              <CardFooter className="flex flex-col sm:flex-row justify-center items-center pt-6">
                   <Link href="/" className="w-full">
                     <Button size="lg" className="w-full text-lg py-7">
                         <Sparkles className="mr-2 h-5 w-5" /> Erstelle dein eigenes Quiz!

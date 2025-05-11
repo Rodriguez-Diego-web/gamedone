@@ -1,8 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { X, Sparkles } from 'lucide-react';
+import { X } from 'lucide-react';
 import { useEffect } from 'react';
+import Image from 'next/image';
+import DudesPerfectLogo from '../app/logo.png';
 
 interface MobileMenuProps {
   isOpen: boolean;
@@ -32,9 +34,13 @@ export default function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
         onClick={(e) => e.stopPropagation()} 
       >
         <header className="mb-12 flex items-center justify-between">
-          <Link href="/" className="flex items-center text-xl font-semibold text-white" onClick={onClose}>
-            <Sparkles className="mr-2 h-6 w-6 text-teal-200" />
-            Friendship Finder
+          <Link href="/" className="flex items-center" onClick={onClose}>
+            <Image 
+              src={DudesPerfectLogo} 
+              alt="Dudes Perfect Logo" 
+              width={80} 
+              height={20} 
+            />
           </Link>
           <button
             onClick={onClose}
