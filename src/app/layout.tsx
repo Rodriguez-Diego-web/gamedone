@@ -76,16 +76,17 @@ const brandStyles = `
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${GeistSans.variable}`}>
+    <html lang="en" className={`${GeistSans.variable}`} suppressHydrationWarning>
       <head>
         <style dangerouslySetInnerHTML={{ __html: brandStyles }} />
       </head>
-      <body className="antialiased flex flex-col min-h-screen">
-        {/* ThemeProvider defaultTheme set to dark */}
+      <body className="antialiased flex flex-col min-h-screen dark">
+        {/* ThemeProvider mit forcedTheme statt defaultTheme für konsistentes Rendering */}
         <ThemeProvider
           attribute="class"
-          defaultTheme="dark" 
-          enableSystem={false} // Disable system theme preference if we force dark
+          defaultTheme="dark"
+          forcedTheme="dark" // Erzwingt konsistentes Dark Theme auf Server und Client
+          enableSystem={false}
           disableTransitionOnChange
         >
           <NextTopLoader color="hsl(var(--brand-pink-h) var(--brand-pink-s) var(--brand-pink-l))" showSpinner={false} />

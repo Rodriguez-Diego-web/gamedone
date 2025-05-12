@@ -82,9 +82,9 @@
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
+  /* * { */
+  /*   @apply border-border; */
+  /* } */
   body {
     @apply bg-background text-foreground;
     /* font-family removed to allow Geist from layout.tsx to take precedence */

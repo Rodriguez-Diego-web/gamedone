@@ -78,8 +78,9 @@ export default function NamePage() {
             </div>
           </CardContent>
           <CardFooter className="px-8 pb-8"> {/* Added padding */}
-            <Button type="submit" className="w-full text-lg py-7"> {/* Increased py */}
-              Weiter: Beantworte deine Fragen
+            <Button type="submit" className="w-full text-lg py-7">
+              <span className="hidden sm:inline">Weiter: Beantworte deine Fragen</span>
+              <span className="sm:hidden">Weiter</span>
               <ArrowRightCircle className="ml-2 h-5 w-5" />
             </Button>
           </CardFooter>

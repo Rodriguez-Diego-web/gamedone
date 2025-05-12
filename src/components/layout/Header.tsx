@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Sparkles, Menu, X } from 'lucide-react'; 
+import { Sparkles } from 'lucide-react'; 
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
 import MobileMenu from '@/components/MobileMenu'; 
@@ -20,14 +20,12 @@ export default function Header() {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
 
-  const iconBaseClass = "absolute h-6 w-6 transform transition-all duration-300 ease-in-out";
-
   if (!isMounted) {
     return null;
   }
 
   return (
-    <header className="py-4 px-4 sm:px-6 lg:px-8 border-b sticky top-0 bg-background/95 backdrop-blur z-50">
+    <header className="py-4 px-4 sm:px-6 lg:px-8 sticky top-0 bg-background/95 backdrop-blur z-50">
       <div className="container mx-auto flex items-center justify-between">
         <Link href="/" className="flex items-center space-x-2 group">
           <Image 
@@ -50,18 +48,31 @@ export default function Header() {
 
         <div className="md:hidden">
           <Button
-            variant="ghost"
+            variant="ghost" 
             size="icon"
             onClick={toggleMobileMenu}
-            className={`relative h-10 w-10 p-2 ${isMobileMenuOpen ? 'hover:bg-teal-600' : 'hover:bg-muted'}`}
+            className="relative h-10 w-10 p-2 flex flex-col justify-center items-center overflow-hidden !bg-transparent hover:!bg-transparent border-none shadow-none"
             aria-label={isMobileMenuOpen ? 'Menü schließen' : 'Menü öffnen'}
           >
-            <Menu
-              className={`${iconBaseClass} ${isMobileMenuOpen ? 'rotate-90 scale-50 opacity-0' : 'rotate-0 scale-100 opacity-100 text-teal-600 group-hover:text-teal-700'}`}
-            />
-            <X
-              className={`${iconBaseClass} ${isMobileMenuOpen ? 'rotate-0 scale-100 opacity-100 text-white' : '-rotate-90 scale-50 opacity-0'}`}
-            />
+            <div className="relative w-6 h-5">
+              {/* Oberer Strich */}
+              <span
+                className={`absolute top-0 left-0 block h-0.5 w-full bg-foreground transition-all duration-500 ease-in-out transform-gpu
+                            ${isMobileMenuOpen ? 'top-[9px] rotate-45' : ''}`}
+              ></span>
+              
+              {/* Mittlerer Strich */}
+              <span
+                className={`absolute top-[9px] left-0 block h-0.5 w-full bg-foreground transition-all duration-500 ease-in-out
+                            ${isMobileMenuOpen ? 'opacity-0 translate-x-3' : ''}`}
+              ></span>
+              
+              {/* Unterer Strich */}
+              <span
+                className={`absolute bottom-0 left-0 block h-0.5 w-full bg-foreground transition-all duration-500 ease-in-out transform-gpu
+                            ${isMobileMenuOpen ? 'bottom-[9px] -rotate-45' : ''}`}
+              ></span>
+            </div>
           </Button>
         </div>
       </div>
